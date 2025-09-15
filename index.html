@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fitness Trainer AI Voice Assistant</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <style>
+    :root{
+      --primary:#4361ee;
+      --primary-dark:#3a56d4;
+      --secondary:#06d6a0;
+      --dark:#1e293b;
+      --light:#f8fafc;
+      --gray:#94a3b8;
+      --danger:#ef476f;
+      --success:#06d6a0;
+      --fitness:#2ecc71;
+    }
+
+    /* === Defensive: hide common injected floating widgets from SDKs === */
+    .vapi-widget, .vapi-floating, .vapi-fab, .vapi-call-button, .vapi-floating-button,
+    .vapi-mic-btn, .mic-animation, .floating-call, .fab-call, .floating-widget {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background:linear-gradient(135deg,#0f172a,#1e293b);
+      color:var(--light);
+      min-height:100vh;padding:20px;
+      display:flex;justify-content:center;align-items:center;
+    }
+
+    .container{
+      width:100%;max-width:980px;background:rgba(30,41,59,0.85);
+      backdrop-filter:blur(10px);border-radius:14px;overflow:hidden;
+      box-shadow:0 12px 30px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);
+      display:flex;flex-direction:column;
+    }
+
+    header{background:rgba(15,23,42,0.9);padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06);
+      display:flex;justify-content:space-between;align-items:center;gap:12px;}
+
+    .logo{display:flex;align-items:center;gap:12px;}
+    .logo-icon{background:var(--primary);width:44px;height:44px;border-radius:50%;display:flex;justify-content:center;align-items:center;font-size:20px;box-shadow:0 6px 18px rgba(67,97,238,0.12);}
+    .logo h1{font-size:20px;font-weight:700;background:linear-gradient(90deg,#4361ee,#06d6a0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+
+    .status-indicator{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--gray);}
+    .status-dot{width:12px;height:12px;border-radius:50%;background:var(--gray);}
+    .status-dot.active{background:var(--success);box-shadow:0 0 8px var(--success);}
+    .status-dot.listening{background:var(--primary);animation:pulse 1.5s infinite;}
+
+    @keyframes pulse{0%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(0.95);}100%{opacity:1;transform:scale(1);}}
+
+    .main-content{display:flex;min-height:520px;gap:0;flex-wrap:nowrap;}
+
+    .controls{width:34%;min-width:260px;padding:22px;border-right:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:18px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);}
+
+    .control-group{background:rgba(15,23,42,0.55);border-radius:10px;padding:14px;}
+    .control-group h2{font-size:16px;margin-bottom:12px;color:var(--secondary);display:flex;align-items:center;gap:8px;}
+    .voice-options{display:flex;flex-direction:column;gap:10px;}
+    .voice-option{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background 0.15s, transform 0.08s;}
+    .voice-option:hover{transform:translateY(-2px);background:rgba(67,97,238,0.06);}
+    .voice-option.active{background:rgba(67,97,238,0.12);border:1px solid rgba(67,97,238,0.15);}
+    .voice-avatar{width:44px;height:44px;border-radius:50%;background:var(--primary);display:flex;justify-content:center;align-items:center;font-size:18px;}
+    .voice-info{flex:1;} .voice-name{font-weight:700;font-size:14px;} .voice-provider{font-size:12px;color:var(--gray);}
+    .action-buttons{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+    .btn{padding:12px 14px;border-radius:8px;font-weight:700;border:none;cursor:pointer;transition:all 0.15s;display:inline-flex;gap:8px;align-items:center;justify-content:center;font-size:14px;}
+    .btn-primary{background:var(--primary);color:#fff;box-shadow:0 8px 20px rgba(67,97,238,0.12);} .btn-primary:hover{background:var(--primary-dark);transform:translateY(-1px);}
+    .btn-secondary{background:rgba(255,255,255,0.03);color:#fff;border:1px solid rgba(255,255,255,0.02);} .btn-secondary:hover{background:rgba(255,255,255,0.05);}
+    .btn:disabled{opacity:0.6;cursor:not-allowed;transform:none;} .control-group p{color:var(--gray);font-size:13px;line-height:1.5;}
+
+    .conversation{width:66%;display:flex;flex-direction:column;min-width:420px;}
+    .transcript{flex:1;padding:22px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);}
+    .message{max-width:85%;padding:12px 14px;border-radius:12px;position:relative;animation:fadeIn 0.22s ease;word-wrap:break-word;box-shadow:0 6px 20px rgba(0,0,0,0.14);}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+    .user-message{background:rgba(67,97,238,0.12);border:1px solid rgba(67,97,238,0.22);align-self:flex-end;border-bottom-right-radius:6px;color:#eaf0ff;}
+    .assistant-message{background:rgba(6,214,160,0.09);border:1px solid rgba(6,214,160,0.18);align-self:flex-start;border-bottom-left-radius:6px;color:#e9fff2;}
+    .system-message{align-self:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.03);color:var(--gray);max-width:95%;}
+    .message-header{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;font-weight:700;font-size:14px;}
+    .message-header small{font-size:12px;font-weight:600;color:var(--gray);margin-left:6px;}
+    .message-content{line-height:1.5;font-size:14px;color:inherit;}
+
+    /* New subtitle/text under each message (shows speaker/voice/transcription) */
+    .message-subtext{
+      margin-top:8px;
+      font-size:12px;
+      color:var(--gray);
+      background:rgba(255,255,255,0.02);
+      padding:6px 8px;border-radius:8px;display:inline-block;
+    }
+
+    .typing-indicator{padding:10px;background:rgba(6,214,160,0.12);border-radius:12px;align-self:flex-start;display:none;gap:6px;}
+    .typing-indicator span{height:8px;width:8px;display:block;border-radius:50%;background:var(--secondary);opacity:0.4;}
+    .typing-indicator span:nth-of-type(1){animation:typing 1s infinite;} .typing-indicator span:nth-of-type(2){animation:typing 1s infinite 0.18s;} .typing-indicator span:nth-of-type(3){animation:typing 1s infinite 0.36s;}
+    @keyframes typing{0%,100%{opacity:0.4;transform:translateY(0);}50%{opacity:1;transform:translateY(-4px);} }
+
+    .input-area{padding:14px;border-top:1px solid rgba(255,255,255,0.04);display:flex;gap:10px;align-items:center;background:rgba(0,0,0,0.02);}
+    .call-btn{background:var(--fitness);border:none;width:52px;height:46px;border-radius:10px;display:flex;justify-content:center;align-items:center;cursor:pointer;font-size:18px;box-shadow:0 6px 18px rgba(46,204,113,0.12);color:#012b13;transition:all 0.12s ease;}
+    .call-btn.call-active{background:var(--danger);color:white;box-shadow:0 6px 18px rgba(239,71,111,0.12);}
+    .input-area input{flex:1;padding:12px 14px;border-radius:10px;border:none;background:rgba(15,23,42,0.6);color:#fff;font-size:15px;min-width:120px;max-width:calc(100% - 120px);}
+    .input-area input:focus{outline:none;box-shadow:0 0 0 3px rgba(67,97,238,0.14);}
+    .send-btn{background:var(--primary);border:none;width:52px;height:46px;border-radius:10px;display:flex;justify-content:center;align-items:center;cursor:pointer;font-size:18px;color:white;transition:all 0.12s;}
+    .send-btn:hover{background:var(--primary-dark);}
+
+    .fitness-assistant{margin:12px 22px 22px 22px;padding:14px;border-radius:12px;background:rgba(46,204,113,0.06);border:1px solid rgba(46,204,113,0.12);color:#eaffef;display:flex;align-items:center;gap:12px;}
+    .fitness-assistant h2{margin:0;color:var(--fitness);font-size:16px;} .fitness-assistant p{margin:0;color:var(--gray);font-size:13px;}
+
+    footer{padding:12px 18px;text-align:center;border-top:1px solid rgba(255,255,255,0.04);font-size:13px;color:var(--gray);} footer code{color:var(--secondary);background:rgba(255,255,255,0.02);padding:2px 6px;border-radius:6px;}
+
+    @media (max-width:900px){.controls{width:40%;min-width:220px;} .conversation{width:60%;min-width:320px;}}
+    @media (max-width:720px){.main-content{flex-direction:column;} .controls{width:100%;border-right:none;border-bottom:1px solid rgba(255,255,255,0.04);} .conversation{width:100;} .container{max-width:720px;}}
+    @media (max-width:420px){header{padding:12px;} .logo h1{font-size:16px;} .call-btn,.send-btn{width:44px;height:40px;} .input-area input{padding:10px;font-size:14px;} .controls{padding:14px;} .transcript{padding:14px;gap:12px;} .container{padding-bottom:6px};}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-microphone-alt"></i></div>
+        <h1>Fitness Trainer AI Voice Assistant</h1>
+      </div>
+
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Ready to start</span>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <!-- Controls column -->
+      <aside class="controls">
+        <div class="control-group">
+          <h2><i class="fas fa-voice"></i> Voice Options</h2>
+
+          <div class="voice-options" id="voiceOptions">
+            <div class="voice-option active" data-voice="sarah" data-provider="11Labs">
+              <div class="voice-avatar">👩</div>
+              <div class="voice-info"><div class="voice-name">Sarah</div><div class="voice-provider">11Labs</div></div>
+            </div>
+
+            <div class="voice-option" data-voice="david" data-provider="11Labs">
+              <div class="voice-avatar">👨</div>
+              <div class="voice-info"><div class="voice-name">David</div><div class="voice-provider">11Labs</div></div>
+            </div>
+
+            <div class="voice-option" data-voice="emily" data-provider="Deepgram">
+              <div class="voice-avatar">👩</div>
+              <div class="voice-info"><div class="voice-name">Emily</div><div class="voice-provider">Deepgram</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
+          <div class="action-buttons">
+            <button id="startBtn" class="btn btn-primary" disabled>
+              <i class="fas fa-microphone"></i> Start Voice Assistant
+            </button>
+
+            <button id="stopBtn" class="btn btn-secondary" disabled>
+              <i class="fas fa-stop"></i> Stop Assistant
+            </button>
+
+            <button id="clearBtn" class="btn btn-secondary">
+              <i class="fas fa-trash-alt"></i> Clear Conversation
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h2><i class="fas fa-info-circle"></i> Assistant Info</h2>
+          <p>You can ask about <strong>fitness routines, nutrition tips, workout guidance, or healthy lifestyle advice</strong>.
+            (Responses will show text subtitles indicating if the message is spoken or generated and which voice/provider was used.)
+          </p>
+        </div>
+      </aside>
+
+      <!-- Conversation column -->
+      <main class="conversation">
+        <div class="transcript" id="transcript">
+          <div class="message assistant-message">
+            <div class="message-header">
+              <i class="fas fa-robot"></i> AI Fitness Assistant
+              <small>(Vapi AI Assistant)</small>
+            </div>
+            <div class="message-content">Hello! I'm your Fitness Trainer AI. Tap the green call button to start a fitness session or use Start to begin a voice assistant call.</div>
+            <div class="message-subtext">Voice: Sarah (11Labs) — Text subtitle shows spoken content as text.</div>
+          </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator"><span></span><span></span><span></span></div>
+
+        <!-- Input area: single call button on left + input + send button on right -->
+        <div class="input-area">
+          <button class="call-btn" id="callBtn" title="Start/Stop Fitness Call">
+            <i class="fas fa-phone"></i>
+          </button>
+
+          <input type="text" id="userInput" placeholder="Type your message here..." autocomplete="off" />
+
+          <button id="sendBtn" class="send-btn" title="Send message">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <!-- Fitness Trainer frontend card -->
+    <div class="fitness-assistant">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="background:rgba(46,204,113,0.12);padding:8px;border-radius:10px;">
+          <i class="fas fa-dumbbell" style="font-size:18px;color:var(--fitness)"></i>
+        </div>
+        <div>
+          <h2>Fitness Trainer AI Assistant</h2>
+          <p>Tap the green call button to start/stop a fitness session. Subtitles will appear below each message showing speaker/voice information and a text version of spoken content.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer><p>| © 2025 Fitness AI Voice Based Assistant | All Rights Reserved |</p></footer>
+  </div>
+
+  <script>
+    /******************************
+     * Configuration (replace)    *
+     ******************************/
+    const assistant = "60ee31ba-31f8-46ce-8482-e4b4b2a0d611"; // replace if needed
+    const apiKey = "8ad9baae-e280-4cb9-a87a-c0823f5b8641";   // replace if needed
+
+    /******************************
+     * DOM refs
+     ******************************/
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const callBtn = document.getElementById('callBtn');
+    const userInput = document.getElementById('userInput');
+    const transcript = document.getElementById('transcript');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const voiceOptions = document.querySelectorAll('.voice-option');
+    const typingIndicator = document.getElementById('typingIndicator');
+
+    /******************************
+     * State
+     ******************************/
+    let vapiInstance = null;
+    let selectedVoice = "sarah";
+    let selectedProvider = "11Labs";
+    let isListening = false;
+    let callActive = false;
+
+    /******************************
+     * Helpers
+     ******************************/
+    function escapeHtml(unsafe){
+      return String(unsafe)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#039;');
+    }
+
+    // Add message to transcript with subtitle/meta text
+    function addMessage(role, content, subtitle, metaText){
+      if(!content || String(content).trim()==='') return;
+      const msg = document.createElement('div');
+      msg.classList.add('message');
+      const safe = escapeHtml(content);
+      if(role === 'user'){
+        msg.classList.add('user-message');
+        msg.innerHTML = `
+          <div class="message-header">
+            <i class="fas fa-user"></i> You <small>(${subtitle || 'Human'})</small>
+          </div>
+          <div class="message-content">${safe}</div>
+        `;
+      } else if(role === 'assistant'){
+        msg.classList.add('assistant-message');
+        msg.innerHTML = `
+          <div class="message-header">
+            <i class="fas fa-robot"></i> Assistant <small>(${subtitle || 'Vapi AI'})</small>
+          </div>
+          <div class="message-content">${safe}</div>
+        `;
+      } else {
+        msg.classList.add('system-message');
+        msg.innerHTML = `
+          <div class="message-header">
+            <i class="fas fa-info-circle"></i> System <small>(${subtitle || 'System'})</small>
+          </div>
+          <div class="message-content">${safe}</div>
+        `;
+      }
+
+      if(metaText){
+        const meta = document.createElement('div');
+        meta.className = 'message-subtext';
+        meta.textContent = metaText;
+        msg.appendChild(meta);
+      }
+
+      transcript.appendChild(msg);
+      transcript.scrollTop = transcript.scrollHeight;
+      typingIndicator.style.display = 'none';
+    }
+
+    function updateStatus(text, cssClass){
+      statusText.textContent = text;
+      statusDot.classList.remove('active','listening');
+      if(cssClass) statusDot.classList.add(cssClass);
+    }
+
+    /******************************
+     * Defensive removal (remove injected floating widgets)
+     ******************************/
+    function removeInjectedWidgets(){
+      const selectors = ['.vapi-widget','.vapi-floating','.vapi-fab','.vapi-call-button','.vapi-floating-button',
+        '.vapi-mic-btn','.mic-animation','.floating-call','.fab-call','.floating-widget'];
+      selectors.forEach(s=>{
+        document.querySelectorAll(s).forEach(el => el.remove());
+      });
+      // ensure our callBtn shows correct icon
+      if(callBtn){
+        callBtn.classList.remove('call-active');
+        callBtn.innerHTML = '<i class="fas fa-phone"></i>';
+      }
+    }
+
+    /******************************
+     * Vapi loader & setup
+     ******************************/
+    function initializeVapi(){
+      // if SDK is already loaded
+      if(window.vapiSDK){
+        setupVapiInstance();
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = "https://cdn.jsdelivr.net/gh/VapiAI/html-script-tag@latest/dist/assets/index.js";
+      s.defer = true; s.async = true;
+      s.onload = () => {
+        try { setupVapiInstance(); }
+        catch(err){ console.error("Vapi init err", err); updateStatus("Vapi load failed",""); }
+      };
+      s.onerror = () => { console.error("Vapi script failed to load"); updateStatus("Vapi script error",""); };
+      document.body.appendChild(s);
+    }
+
+    function setupVapiInstance(){
+      if(!window.vapiSDK){ updateStatus("Vapi not available",""); return; }
+      vapiInstance = window.vapiSDK.run({ apiKey, assistant, config: {} });
+      setupVapiListeners();
+      startBtn.disabled = false;
+      updateStatus("Ready to start","active");
+    }
+
+    function setupVapiListeners(){
+      if(!vapiInstance || typeof vapiInstance.on !== 'function') return;
+
+      vapiInstance.on('call-start', () => {
+        updateStatus("Call in progress","active");
+        addMessage('assistant',"Hello! How can I help you today?","Vapi AI", `Voice: ${selectedVoice} (${selectedProvider}) — Spoken as audio & shown as subtitle.`);
+      });
+
+      vapiInstance.on('call-end', () => {
+        updateStatus("Call ended","");
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        isListening = false;
+        typingIndicator.style.display = 'none';
+        // sync call button UI
+        if(callActive){
+          callActive = false;
+          callBtn.classList.remove('call-active');
+          callBtn.innerHTML = '<i class="fas fa-phone"></i>';
+        }
+      });
+
+      vapiInstance.on('speech-start', () => { updateStatus("Listening...","listening"); isListening = true; });
+
+      vapiInstance.on('speech-end', () => { updateStatus("Processing...","active"); isListening = false; typingIndicator.style.display = 'flex'; });
+
+      vapiInstance.on('transcript', (ev) => {
+        if(ev && ev.text && ev.text.trim()!==''){
+          // show user spoken text, with a subtitle that indicates it was transcribed speech
+          addMessage('user', ev.text, 'Human', 'Transcribed speech (text subtitle).');
+        }
+      });
+
+      vapiInstance.on('message', (msg) => {
+        if(msg && msg.role === 'assistant' && msg.content && msg.content.trim()!==''){
+          // show assistant text + subtext noting voice/provider
+          addMessage('assistant', msg.content, 'Vapi AI', `Voice: ${selectedVoice} (${selectedProvider}) — spoken audio shown as text subtitle.`);
+        }
+      });
+
+      vapiInstance.on('function-call', (f) => {
+        if(f && f.name) addMessage('system', `Function called: ${f.name}`, 'Function');
+      });
+
+      vapiInstance.on('error', (err) => {
+        console.error('Vapi error:', err);
+        const m = err && err.message ? err.message : 'Unknown error';
+        updateStatus(`Error: ${m}`, "");
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        isListening = false;
+        typingIndicator.style.display = 'none';
+      });
+    }
+
+    /******************************
+     * UI Event handlers
+     ******************************/
+    startBtn.addEventListener('click', () => {
+      if(!vapiInstance){ addMessage('system','Vapi not loaded yet. Initializing...','System'); initializeVapi(); return; }
+      try{
+        vapiInstance.start({ voice: { provider: selectedProvider, voiceId: selectedVoice }, metadata:{sessionType:'general'} });
+        startBtn.disabled = true; stopBtn.disabled = false; updateStatus("Starting call...","active");
+      } catch(err){ console.error(err); addMessage('system','Failed to start call: '+(err.message||err), 'System'); }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if(!vapiInstance) return;
+      try{ vapiInstance.stop(); } catch(e){ console.warn(e); }
+      startBtn.disabled = false; stopBtn.disabled = true; updateStatus("Stopped", "");
+      typingIndicator.style.display = 'none';
+      if(callActive){ callActive=false; callBtn.classList.remove('call-active'); callBtn.innerHTML = '<i class="fas fa-phone"></i>'; }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      transcript.innerHTML = `
+        <div class="message assistant-message">
+          <div class="message-header"><i class="fas fa-robot"></i> Assistant <small>(Vapi AI Assistant)</small></div>
+          <div class="message-content">Conversation cleared. Start a new conversation when ready.</div>
+          <div class="message-subtext">Voice: ${selectedVoice} (${selectedProvider})</div>
+        </div>
+      `;
+      transcript.scrollTop = transcript.scrollHeight;
+    });
+
+    sendBtn.addEventListener('click', sendTextMessage);
+    userInput.addEventListener('keypress', (e)=>{ if(e.key === 'Enter') sendTextMessage(); });
+
+    function sendTextMessage(){
+      const msg = userInput.value.trim(); if(!msg) return;
+      addMessage('user', msg, 'Human', 'Typed text (not transcribed).');
+      userInput.value = ''; typingIndicator.style.display = 'flex';
+      if(vapiInstance && typeof vapiInstance.send === 'function'){
+        try{ vapiInstance.send(msg); } catch(err){ console.warn('vapi send err',err); addMessage('system','Failed to send message to Vapi.','System'); typingIndicator.style.display='none'; }
+      } else {
+        setTimeout(()=>{ addMessage('assistant', "I can't reach Vapi right now. This is a UI-only reply.", "Vapi AI", `Voice: ${selectedVoice} (${selectedProvider})`); typingIndicator.style.display='none'; },700);
+      }
+    }
+
+    voiceOptions.forEach(opt=>{
+      opt.addEventListener('click', ()=>{
+        voiceOptions.forEach(o=>o.classList.remove('active'));
+        opt.classList.add('active');
+        selectedVoice = opt.dataset.voice || 'sarah';
+        selectedProvider = opt.dataset.provider || '11Labs';
+      });
+    });
+
+    // LEFT CALL BUTTON: toggle fitness session start/stop
+    callBtn.addEventListener('click', () => {
+      if(!callActive){
+        // start
+        callActive = true;
+        callBtn.classList.add('call-active'); callBtn.innerHTML = '<i class="fas fa-phone-slash"></i>';
+        addMessage('assistant','Fitness Trainer session starting...','Fitness Trainer', `Voice: ${selectedVoice} (${selectedProvider})`);
+        if(vapiInstance && typeof vapiInstance.start === 'function'){
+          try{
+            vapiInstance.start({ voice:{provider:selectedProvider, voiceId:selectedVoice}, metadata:{sessionType:'fitness'} });
+            updateStatus('Fitness session: Call in progress','active'); startBtn.disabled=true; stopBtn.disabled=false;
+          } catch(err){ console.warn('start fitness err',err); addMessage('system','Could not start fitness call via Vapi.','System'); callActive=false; callBtn.classList.remove('call-active'); callBtn.innerHTML = '<i class="fas fa-phone"></i>'; }
+        } else {
+          addMessage('system','Vapi not loaded — fitness session running in UI-only mode.','System');
+          updateStatus('Fitness (UI-only)','active');
+        }
+      } else {
+        // stop
+        callActive = false;
+        callBtn.classList.remove('call-active'); callBtn.innerHTML = '<i class="fas fa-phone"></i>';
+        addMessage('assistant','Fitness Trainer session ended.','Fitness Trainer');
+        if(vapiInstance && typeof vapiInstance.stop === 'function'){
+          try{ vapiInstance.stop(); } catch(err){ console.warn('stop error',err); }
+        }
+        startBtn.disabled=false; stopBtn.disabled=true; updateStatus('Stopped',''); typingIndicator.style.display='none';
+      }
+    });
+
+    /******************************
+     * Startup
+     ******************************/
+    window.addEventListener('DOMContentLoaded', () => {
+      // remove any injected floating widget (defensive)
+      removeInjectedWidgets();
+      // initialize vapi
+      initializeVapi();
+      // ensure call button initial state
+      callBtn.classList.remove('call-active'); callBtn.innerHTML = '<i class="fas fa-phone"></i>';
+    });
+
+    // Also run removal shortly after (in case SDK injects later)
+    setTimeout(removeInjectedWidgets, 1500);
+  </script>
+</body>
+</html>
